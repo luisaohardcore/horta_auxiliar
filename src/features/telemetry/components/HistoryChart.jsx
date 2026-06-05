@@ -115,7 +115,7 @@ useEffect(() => {
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
         <h3 className="text-lg font-semibold text-red-800 mb-2">Falha na Sincronização</h3>
         <p className="text-red-600 max-w-md">{error}</p>
-        <button onClick={() => loadAllData(True)}className="mt-6 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg transition-colors">
+        <button onClick={() => loadAllData(true)} className="mt-6 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg transition-colors">
           Tentar Novamente
         </button>
       </div>

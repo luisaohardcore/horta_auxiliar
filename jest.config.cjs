@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
@@ -7,8 +7,5 @@ export default {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
-  testMatch: ['**/__tests__/**/*.(test|spec).(js|jsx)', '**/?(*.)+(spec|test).(js|jsx)'],
-  globals: {
-    'import.meta': { env: { VITE_USE_MOCK: 'true' } },
-  },
+  testMatch: ['**/?(*.)+(spec|test).(js|jsx)'],
 };

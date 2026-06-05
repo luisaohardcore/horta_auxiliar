@@ -7,6 +7,7 @@ import {
   fetchCanteiros, createCanteiro, updateCanteiro, deleteCanteiro,
 } from '../services/canteirosService.js';
 import { logger } from '../../../shared/utils/logger.js';
+import ErrorBlock from '../../../shared/components/ErrorBlock.jsx';
 
 const EMPTY_FORM = {
   nome: '', cultura: '', area_m2: '', data_plantio: '',
@@ -138,7 +139,7 @@ export default function CanteirosPage() {
       setCanteiros(data);
       logger.info('CanteirosPage', 'loaded', { count: data.length });
     } catch (err) {
-      setError(err.message);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -172,7 +173,7 @@ export default function CanteirosPage() {
       setToast('Canteiro excluído.');
       logger.info('CanteirosPage', 'deleted', { id });
     } catch (err) {
-      setError(err.message);
+      setError(err);
     }
   };
 
@@ -183,15 +184,7 @@ export default function CanteirosPage() {
     </div>
   );
 
-  if (error) return (
-    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 rounded-xl p-8 text-center">
-      <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-      <p className="text-red-700 font-semibold mb-4">{error}</p>
-      <button onClick={load} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium">
-        Tentar novamente
-      </button>
-    </div>
-  );
+  if (error) return <ErrorBlock error={error} onRetry={load} />;
 
   return (
     <div className="space-y-5" data-testid="canteiros-page">

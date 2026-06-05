@@ -41,6 +41,7 @@ function _log(level, component, message, payload = {}) {
     requestId: _currentRequestId,
     component,
     message,
+    ...(payload.code ? { errorCode: payload.code } : {}),
     ...payload,
   };
 

@@ -8,6 +8,7 @@ import { fetchAlertas, markAlertaLido } from '../services/alertasService.js';
 import { CANTEIROS_MOCK } from '../../canteiros/mocks/canteiros.mock.js';
 import { TIPOS_ALERTA, SEVERIDADES } from '../mocks/alertas.mock.js';
 import { logger, metrics } from '../../../shared/utils/logger.js';
+import ErrorBlock from '../../../shared/components/ErrorBlock.jsx';
 
 const SEV_STYLES = {
   critico: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900',
@@ -67,7 +68,7 @@ export default function AlertasPage() {
       metrics.recordAlertDisplayed(res.items.length);
       logger.info('AlertasPage', 'loaded', { total: res.total, page: p });
     } catch (err) {
-      setError(err.message);
+      setError(err);
       logger.error('AlertasPage', 'load_error', { message: err.message });
     } finally {
       setLoading(false);
@@ -92,15 +93,7 @@ export default function AlertasPage() {
     </div>
   );
 
-  if (error && alertas.length === 0) return (
-    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 rounded-xl p-8 text-center">
-      <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-      <p className="text-red-700 dark:text-red-300 font-semibold mb-4">{error}</p>
-      <button onClick={() => load(0)} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium">
-        Tentar novamente
-      </button>
-    </div>
-  );
+  if (error && alertas.length === 0) return <ErrorBlock error={error} onRetry={() => load(0)} />;
 
   return (
     <div className="space-y-5" data-testid="alertas-page">

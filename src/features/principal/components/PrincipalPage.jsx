@@ -12,6 +12,7 @@ import {
 } from '../../telemetry/services/telemetryService.js';
 import { CANTEIROS_MOCK } from '../../canteiros/mocks/canteiros.mock.js';
 import { logger, metrics } from '../../../shared/utils/logger.js';
+import ErrorBlock from '../../../shared/components/ErrorBlock.jsx';
 
 ChartJS.register(
   CategoryScale, LinearScale, TimeScale, PointElement, LineElement,
@@ -73,7 +74,7 @@ export default function PrincipalPage() {
       setError(null);
       logger.info('PrincipalPage', 'data_loaded', { canteiro: selectedCanteiro, points: hist.length });
     } catch (err) {
-      setError(err.message);
+      setError(err);
       logger.error('PrincipalPage', 'load_error', { message: err.message });
     } finally {
       setLoading(false);
@@ -164,16 +165,7 @@ export default function PrincipalPage() {
     </div>
   );
 
-  if (error) return (
-    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-8 text-center">
-      <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-      <p className="text-red-700 dark:text-red-300 font-semibold mb-4">{error}</p>
-      <button onClick={() => load(true)}
-        className="px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg font-medium text-sm">
-        Tentar novamente
-      </button>
-    </div>
-  );
+  if (error) return <ErrorBlock error={error} onRetry={() => load(true)} />;
 
   return (
     <div className="space-y-6" data-testid="principal-page">

@@ -1,15 +1,48 @@
-# Sistema de Monitoramento de Horta Comunitária Inteligente
+# HortaSmart Dashboard
 
-**Equipe:** Cleive dos Santos Costa - RA: 207900, Lucas Freitas Dias Gonaçalves - RA: 211230
-**Disciplina:** Projeto Integrador (5º Período - Engenharia de Computação / UNASP-EC)
+Dashboard de monitoramento da Horta Comunitária Inteligente.  
+**v0.2.0-dashboard-rc** — Release 2 (A1.8)
 
-## Escopo do Projeto
+## Pré-requisitos
 
-Desenvolvimento de um sistema de IoT (Hardware + Software) para monitorar variáveis climáticas (umidade do solo e temperatura) e automatizar a irrigação de uma horta comunitária. O sistema envolve nós sensores com ESP32, comunicação Wi-Fi, armazenamento em Banco de Dados Relacional e um Dashboard Web para gestão e alertas.
+- Node.js LTS (≥ 20)
+- npm ≥ 9
 
-## Links Rápidos
+## Instalação e execução
 
-* [Processos da Equipe](process.md)
-* [Métricas de Saúde](metrics.md)
-* [Especificação de Requisitos (SRS)](requirements/srs.md)
-* [Stakeholders](requirements/stakeholders.md)
+```bash
+git clone https://github.com/luisaohardcore/horta_auxiliar.git
+cd horta_auxiliar
+npm install
+npm run dev        # http://localhost:5173
+```
+
+Sem `.env` necessário — dados mockados por padrão.
+
+### Apontar para API real
+
+```bash
+VITE_API_URL=https://sua-api.com npm run dev
+```
+
+## Testes
+
+```bash
+npm test           # 31 testes (6 suites)
+```
+
+## Telas disponíveis
+
+| Tela | Rota (tab) | Descrição |
+|---|---|---|
+| Principal | `principal` | Gráficos tempo/umidade/luz + status atual + relatório semanal de irrigação |
+| Alertas | `alertas` | Lista filtrada de alertas com marcar lido |
+| Histórico | `historico` | Tabela paginada de leituras + exportação CSV |
+| Canteiros | `canteiros` | CRUD completo com validação |
+
+## Documentação
+
+- `docs/releases/release-2.md` — Release notes detalhadas
+- `docs/dashboard/threat-model.md` — Modelo de ameaças do front-end
+- `docs/ops/observability-dashboard.md` — Logs, métricas e runbook
+- `docs/dashboard/evidencias/` — Evidências de testes e npm audit

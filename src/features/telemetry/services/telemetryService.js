@@ -1,30 +1,88 @@
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/v1`;
+// src/features/telemetry/services/telemetryService.js
+import { logger, metrics, generateRequestId } from '../../../shared/utils/logger.js';
+import {
+  MOCK_CANTEIRO_A, MOCK_CANTEIRO_B, MOCK_CANTEIRO_C, ALL_TELEMETRY,
+} from '../mocks/telemetry.mock.js';
 
-const fetchWithTimeout = async (url, timeoutMs = 40000) => {
+const BASE_URL = `${import.meta.env.VITE_API_URL ?? ''}/api/v1`;
+const USE_MOCK = !import.meta.env.VITE_API_URL || import.meta.env.VITE_USE_MOCK === 'true';
+
+const MOCK_BY_CANTEIRO = {
+  'canteiro-a': MOCK_CANTEIRO_A,
+  'canteiro-b': MOCK_CANTEIRO_B,
+  'canteiro-c': MOCK_CANTEIRO_C,
+};
+
+async function fetchWithTimeout(url, timeoutMs = 40_000) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
+  const tid = setTimeout(() => controller.abort(), timeoutMs);
+  const reqId = generateRequestId();
+  const t0 = Date.now();
+  logger.info('telemetryService', 'fetch_start', { url, requestId: reqId });
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(tid);
+    const ms = Date.now() - t0;
+    metrics.recordFetch(ms, res.ok);
+    logger.info('telemetryService', 'fetch_ok', { url, status: res.status, ms });
+    return res;
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('O servidor está demorando para responder. Ele pode estar acordando — aguarde alguns segundos e tente novamente.');
-    }
+    clearTimeout(tid);
+    const ms = Date.now() - t0;
+    metrics.recordFetch(ms, false);
+    if (err.name === 'AbortError')
+      throw new Error('Timeout: servidor demorou mais de 40 s para responder.');
+    logger.error('telemetryService', 'fetch_error', { url, message: err.message });
     throw err;
   }
+}
+
+export const fetchCurrentTelemetry = async (canteiroId = 'canteiro-a') => {
+  if (USE_MOCK) {
+    const data = MOCK_BY_CANTEIRO[canteiroId] ?? MOCK_CANTEIRO_A;
+    const last = data.findLast(d => d.status !== 'offline') ?? data[data.length - 1];
+    return last;
+  }
+  const res = await fetchWithTimeout(`${BASE_URL}/telemetria/atual?canteiro=${canteiroId}`);
+  if (!res.ok) throw new Error('Erro ao buscar leitura em tempo real.');
+  return res.json();
 };
 
-export const fetchCurrentTelemetry = async () => {
-  const response = await fetchWithTimeout(`${BASE_URL}/telemetria/atual`);
-  if (!response.ok) throw new Error('Erro ao buscar leitura em tempo real.');
-  return response.json();
+export const fetchTelemetryHistory = async (canteiroId = 'canteiro-a', days = 1) => {
+  if (USE_MOCK) {
+    const data = MOCK_BY_CANTEIRO[canteiroId] ?? MOCK_CANTEIRO_A;
+    const cutoff = new Date(Date.now() - days * 86_400_000);
+    return data.filter(d => new Date(d.timestamp) >= cutoff);
+  }
+  const res = await fetchWithTimeout(`${BASE_URL}/telemetria/historico?canteiro=${canteiroId}&days=${days}`);
+  if (!res.ok) throw new Error('Falha ao buscar historico.');
+  return res.json();
 };
 
-export const fetchTelemetryHistory = async () => {
-  const response = await fetchWithTimeout(`${BASE_URL}/telemetria/historico`);
-  if (!response.ok) throw new Error('Falha ao conectar com a API da Horta.');
-  return response.json();
+export const fetchAllTelemetry = async (days = 7) => {
+  if (USE_MOCK) {
+    const cutoff = new Date(Date.now() - days * 86_400_000);
+    return ALL_TELEMETRY.filter(d => new Date(d.timestamp) >= cutoff);
+  }
+  const res = await fetchWithTimeout(`${BASE_URL}/telemetria?days=${days}`);
+  if (!res.ok) throw new Error('Falha ao buscar telemetria geral.');
+  return res.json();
+};
+
+export const fetchWeeklyWaterReport = async () => {
+  const data = await fetchAllTelemetry(7);
+  const report = {};
+  for (const d of data) {
+    if (!d.canteiro_id) continue;
+    if (!report[d.canteiro_id]) report[d.canteiro_id] = { irrigacoes: 0, total_min: 0 };
+    if (d.status_bomba) {
+      report[d.canteiro_id].irrigacoes += 1;
+      report[d.canteiro_id].total_min  += 1;
+    }
+  }
+  return Object.entries(report).map(([canteiro_id, s]) => ({
+    canteiro_id,
+    ...s,
+    estimativa_litros: s.total_min * 12,
+  }));
 };

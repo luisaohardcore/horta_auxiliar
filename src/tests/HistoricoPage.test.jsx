@@ -5,71 +5,84 @@ import HistoricoPage from '../features/historico/components/HistoricoPage.jsx';
 import * as svc from '../features/historico/services/historicoService.js';
 
 jest.mock('../features/historico/services/historicoService.js');
+jest.mock('react-chartjs-2', () => ({
+  Line: () => <canvas data-testid="line-chart" />,
+}));
+jest.mock('chart.js', () => ({
+  Chart:         { register: jest.fn() },
+  CategoryScale: class {}, LinearScale: class {}, PointElement: class {},
+  LineElement: class {}, TimeScale: class {}, Title: class {},
+  Tooltip: class {}, Legend: class {}, Filler: class {},
+}));
+jest.mock('chartjs-adapter-date-fns', () => ({}));
+
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(q => ({
+      matches: false, media: q, onchange: null,
+      addEventListener: jest.fn(), removeEventListener: jest.fn(), dispatchEvent: jest.fn(),
+    })),
+  });
+});
 
 const makeRows = (n, overrides = {}) =>
   Array.from({ length: n }, (_, i) => ({
-    id: i,
-    canteiro_id: 'canteiro-a',
+    id: i, canteiro_id: 'canteiro-a',
     timestamp: new Date(Date.now() - i * 3600_000).toISOString(),
-    temperatura: 24.5, temperatura_solo: 22.0,
-    umidade: 68.0, umidade_solo: 42.0,
-    luminosidade: 80000, PH_solo: 6.2,
-    status_bomba: false, irrigacao_manual: false,
-    status: 'ok',
-    ...overrides,
+    temperatura: 24.5, temperatura_solo: 22.0, umidade: 68.0, umidade_solo: 42.0,
+    luminosidade: 80000, PH_solo: 6.2, status_bomba: false, irrigacao_manual: false,
+    status: 'ok', ...overrides,
   }));
 
 describe('HistoricoPage', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('exibe spinner durante carregamento inicial', () => {
-    svc.fetchHistorico.mockResolvedValue({ items: [], total: 0, page: 0, limit: 20, totalPages: 0 });
+  test('exibe spinner durante carregamento', () => {
+    svc.fetchHistorico.mockResolvedValue({ items: [], total: 0, page: 0, limit: 9999, totalPages: 0 });
     render(<HistoricoPage />);
-    // spinner inside table while rows are empty
-    expect(screen.getByText(/carregando…/i)).toBeInTheDocument();
+    expect(screen.getByText(/carregando histórico/i)).toBeInTheDocument();
   });
 
-  test('renderiza linhas da tabela após sucesso', async () => {
-    const rows = makeRows(3);
-    svc.fetchHistorico.mockResolvedValue({ items: rows, total: 3, page: 0, limit: 20, totalPages: 1 });
+  test('renderiza gráficos após carregar dados', async () => {
+    svc.fetchHistorico.mockResolvedValue({ items: makeRows(10), total: 10, page: 0, limit: 9999, totalPages: 1 });
     render(<HistoricoPage />);
     await waitFor(() => {
-      // 3 rows → 3 'CA' canteiro cells
-      expect(screen.getAllByText('CA')).toHaveLength(3);
+      expect(screen.getAllByTestId('line-chart').length).toBeGreaterThanOrEqual(4);
     });
   });
 
-  test('mostra célula — para leituras nulas (sensor offline)', async () => {
-    const rows = makeRows(1, { status: 'offline', temperatura: null, PH_solo: null });
-    svc.fetchHistorico.mockResolvedValue({ items: rows, total: 1, page: 0, limit: 20, totalPages: 1 });
+  test('exibe títulos dos 4 gráficos', async () => {
+    svc.fetchHistorico.mockResolvedValue({ items: makeRows(5), total: 5, page: 0, limit: 9999, totalPages: 1 });
     render(<HistoricoPage />);
     await waitFor(() => {
-      // Multiple — cells for null values
-      const dashes = screen.getAllByText('—');
-      expect(dashes.length).toBeGreaterThan(0);
+      expect(screen.getByText(/🌡️ temperatura/i)).toBeInTheDocument();
+      expect(screen.getByText(/💧 umidade/i)).toBeInTheDocument();
+      expect(screen.getByText(/☀️ luminosidade/i)).toBeInTheDocument();
+      expect(screen.getByText(/🧪 pH/i)).toBeInTheDocument();
     });
   });
 
-  test('exibe badge "Manual" para irrigação manual', async () => {
-    const rows = makeRows(1, { status_bomba: true, irrigacao_manual: true });
-    svc.fetchHistorico.mockResolvedValue({ items: rows, total: 1, page: 0, limit: 20, totalPages: 1 });
+  test('exibe estatísticas de resumo (mín/méd/máx)', async () => {
+    svc.fetchHistorico.mockResolvedValue({ items: makeRows(5), total: 5, page: 0, limit: 9999, totalPages: 1 });
     render(<HistoricoPage />);
     await waitFor(() => {
-      expect(screen.getByText(/manual/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/méd/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/máx/i).length).toBeGreaterThan(0);
     });
   });
 
-  test('exibe paginação quando totalPages > 1', async () => {
-    const rows = makeRows(20);
-    svc.fetchHistorico.mockResolvedValue({ items: rows, total: 60, page: 0, limit: 20, totalPages: 3 });
+  test('exibe empty state quando não há leituras válidas', async () => {
+    const offlineRows = makeRows(3, { status: 'offline' });
+    svc.fetchHistorico.mockResolvedValue({ items: offlineRows, total: 3, page: 0, limit: 9999, totalPages: 1 });
     render(<HistoricoPage />);
     await waitFor(() => {
-      expect(screen.getByText(/página 1 de 3/i)).toBeInTheDocument();
+      expect(screen.getByText(/sem leituras válidas/i)).toBeInTheDocument();
     });
   });
 
   test('chama exportHistoricoCSV ao clicar em Exportar CSV', async () => {
-    svc.fetchHistorico.mockResolvedValue({ items: makeRows(2), total: 2, page: 0, limit: 20, totalPages: 1 });
+    svc.fetchHistorico.mockResolvedValue({ items: makeRows(3), total: 3, page: 0, limit: 9999, totalPages: 1 });
     svc.exportHistoricoCSV.mockResolvedValue(undefined);
     render(<HistoricoPage />);
     await waitFor(() => expect(screen.getByText(/exportar csv/i)).toBeInTheDocument());
@@ -77,7 +90,7 @@ describe('HistoricoPage', () => {
     expect(svc.exportHistoricoCSV).toHaveBeenCalledTimes(1);
   });
 
-  test('exibe estado de erro quando fetch falha', async () => {
+  test('exibe ErrorBlock quando fetch falha', async () => {
     svc.fetchHistorico.mockRejectedValue(new Error('Timeout na conexão'));
     render(<HistoricoPage />);
     await waitFor(() => {

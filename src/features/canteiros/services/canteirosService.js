@@ -9,9 +9,16 @@ let _nextId = 10;
 
 export const fetchCanteiros = async () => {
   logger.info('canteirosService', 'fetch_canteiros');
+  if (USE_MOCK) return [..._store];
   try {
-    if (USE_MOCK) return [..._store];
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/canteiros`);
+    if (res.status === 404) {
+      logger.warn('canteirosService', 'endpoint_not_found_fallback_mock', {
+        code: ERROR_CODES.CNT_FETCH,
+        note: 'Endpoint /canteiros ausente na API — usando dados mock.',
+      });
+      return [..._store];
+    }
     if (!res.ok) throw new HortaError(ERROR_CODES.CNT_FETCH, `HTTP ${res.status} ao buscar canteiros.`);
     return res.json();
   } catch (err) {
@@ -46,6 +53,12 @@ export const createCanteiro = async (payload) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (res.status === 404) {
+      logger.warn('canteirosService', 'create_fallback_mock', { code: ERROR_CODES.CNT_CREATE });
+      const novo = { ...payload, id: `canteiro-${++_nextId}`, status: payload.status ?? 'ativo' };
+      _store.push(novo);
+      return novo;
+    }
     if (!res.ok) throw new HortaError(ERROR_CODES.CNT_CREATE, `HTTP ${res.status} ao criar canteiro.`);
     return res.json();
   } catch (err) {
@@ -69,6 +82,13 @@ export const updateCanteiro = async (id, payload) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (res.status === 404) {
+      logger.warn('canteirosService', 'update_fallback_mock', { id, code: ERROR_CODES.CNT_UPDATE });
+      const idx = _store.findIndex(x => x.id === id);
+      if (idx === -1) throw new HortaError(ERROR_CODES.CNT_NOT_FOUND, `Canteiro "${id}" não encontrado.`);
+      _store[idx] = { ..._store[idx], ...payload };
+      return _store[idx];
+    }
     if (!res.ok) throw new HortaError(ERROR_CODES.CNT_UPDATE, `HTTP ${res.status} ao atualizar canteiro.`);
     return res.json();
   } catch (err) {
@@ -85,6 +105,11 @@ export const deleteCanteiro = async (id) => {
       return { success: true };
     }
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/canteiros/${id}`, { method: 'DELETE' });
+    if (res.status === 404) {
+      logger.warn('canteirosService', 'delete_fallback_mock', { id, code: ERROR_CODES.CNT_DELETE });
+      _store = _store.filter(x => x.id !== id);
+      return { success: true };
+    }
     if (!res.ok) throw new HortaError(ERROR_CODES.CNT_DELETE, `HTTP ${res.status} ao excluir canteiro.`);
     return res.json();
   } catch (err) {

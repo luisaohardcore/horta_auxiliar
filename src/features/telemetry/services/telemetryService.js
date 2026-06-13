@@ -78,18 +78,21 @@ export const fetchAllTelemetry = async (days = 7) => {
 };
 
 export const fetchWeeklyWaterReport = async () => {
-  const data = await fetchAllTelemetry(7);
-  const report = {};
-  for (const d of data) {
-    if (!d.canteiro_id) continue;
-    if (!report[d.canteiro_id]) report[d.canteiro_id] = { irrigacoes: 0, total_min: 0 };
-    if (d.status_bomba) {
-      report[d.canteiro_id].irrigacoes += 1;
-      report[d.canteiro_id].total_min  += 1;
+  // Uses /telemetria/historico per canteiro — works with the real API endpoints
+  const CANTEIROS = ['canteiro-a', 'canteiro-b', 'canteiro-c'];
+  const results = await Promise.allSettled(
+    CANTEIROS.map(id => fetchTelemetryHistory(id, 7))
+  );
+  return results.map((result, i) => {
+    const canteiro_id = CANTEIROS[i];
+    if (result.status === 'rejected') {
+      logger.warn('telemetryService', 'water_report_partial', {
+        canteiro_id, error: result.reason?.message,
+      });
+      return { canteiro_id, irrigacoes: 0, total_min: 0, estimativa_litros: 0 };
     }
-  }
-  return Object.entries(report).map(([canteiro_id, s]) => ({
-    canteiro_id, ...s,
-    estimativa_litros: s.total_min * 12,
-  }));
+    const data = result.value ?? [];
+    const irrigacoes = data.filter(d => d.status_bomba).length;
+    return { canteiro_id, irrigacoes, total_min: irrigacoes, estimativa_litros: irrigacoes * 12 };
+  });
 };

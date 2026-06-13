@@ -22,6 +22,20 @@ export const fetchHistorico = async ({ canteiroId, page = 0, limit = PAGE_SIZE, 
     const params = new URLSearchParams({ page, limit, days });
     if (canteiroId && canteiroId !== 'todos') params.set('canteiro', canteiroId);
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/historico?${params}`);
+    if (res.status === 404) {
+      logger.warn('historicoService', 'endpoint_not_found_fallback_mock', {
+        code: ERROR_CODES.HST_FETCH,
+        note: 'Endpoint /historico ausente na API — usando dados mock.',
+      });
+      // fallback: reuse mock path
+      const cutoff = new Date(Date.now() - days * 86_400_000);
+      let data = ALL_TELEMETRY
+        .filter(d => new Date(d.timestamp) >= cutoff)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      if (canteiroId && canteiroId !== 'todos') data = data.filter(d => d.canteiro_id === canteiroId);
+      const total = data.length;
+      return { items: data.slice(page * limit, (page + 1) * limit), total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
     if (!res.ok) throw new HortaError(ERROR_CODES.HST_FETCH, `HTTP ${res.status} ao buscar histórico.`);
     return res.json();
   } catch (err) {

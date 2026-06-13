@@ -6,6 +6,10 @@
 
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 const MIN_LEVEL = LEVELS.DEBUG;
+const MAX_LOG_STORE = 200;
+
+// In-memory log store — readable by AlertasPage
+const _logs = [];
 
 // In-memory metrics store (observable via window.__horta_metrics__ in DevTools)
 const _metrics = {
@@ -53,6 +57,10 @@ function _log(level, component, message, payload = {}) {
     default:      console.log(line);
   }
 
+  // Keep last MAX_LOG_STORE entries in memory
+  _logs.push(entry);
+  if (_logs.length > MAX_LOG_STORE) _logs.shift();
+
   return entry;
 }
 
@@ -64,6 +72,8 @@ export const logger = {
   warn:  (component, message, payload) => _log('WARN',  component, message, payload),
   error: (component, message, payload) => _log('ERROR', component, message, payload),
 };
+
+export const getLogs = () => [..._logs].reverse(); // newest first
 
 // ── Metrics helpers ─────────────────────────────────────────────
 

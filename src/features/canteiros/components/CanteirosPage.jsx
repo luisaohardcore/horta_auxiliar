@@ -7,6 +7,7 @@ import {
   fetchCanteiros, createCanteiro, updateCanteiro, deleteCanteiro,
 } from '../services/canteirosService.js';
 import { logger } from '../../../shared/utils/logger.js';
+import { refreshCanteiros } from '../../../shared/hooks/useCanteiros.js';
 import ErrorBlock from '../../../shared/components/ErrorBlock.jsx';
 
 const EMPTY_FORM = {
@@ -36,11 +37,18 @@ function CanteirosForm({ initial, onSave, onCancel, saving }) {
     setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
+  const [submitError, setSubmitError] = useState(null);
+
   const handleSubmit = async () => {
+    setSubmitError(null);
     try {
       await onSave({ ...form, area_m2: parseFloat(form.area_m2), umidade_critica: parseFloat(form.umidade_critica) });
     } catch (err) {
-      if (err.validationErrors) setErrors(err.validationErrors);
+      if (err.validationErrors) {
+        setErrors(err.validationErrors);
+      } else {
+        setSubmitError(err.message ?? 'Erro ao salvar canteiro.');
+      }
     }
   };
 
@@ -100,6 +108,9 @@ function CanteirosForm({ initial, onSave, onCancel, saving }) {
         </div>
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800">
+          {submitError && (
+            <p className="text-xs text-red-500 flex-1 self-center">{submitError}</p>
+          )}
           <button onClick={onCancel} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
             Cancelar
           </button>
@@ -154,12 +165,17 @@ export default function CanteirosPage() {
         const novo = await createCanteiro(payload);
         setCanteiros(prev => [...prev, novo]);
         setToast('Canteiro criado com sucesso!');
+        refreshCanteiros();
       } else {
         const updated = await updateCanteiro(modalMode.id, payload);
         setCanteiros(prev => prev.map(c => c.id === updated.id ? updated : c));
         setToast('Canteiro atualizado!');
+        refreshCanteiros();
       }
       setModal(null);
+    } catch (err) {
+      // Re-throw so CanteirosForm.handleSubmit can display it
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -171,6 +187,7 @@ export default function CanteirosPage() {
       await deleteCanteiro(id);
       setCanteiros(prev => prev.filter(c => c.id !== id));
       setToast('Canteiro excluído.');
+      refreshCanteiros();
       logger.info('CanteirosPage', 'deleted', { id });
     } catch (err) {
       setError(err);
